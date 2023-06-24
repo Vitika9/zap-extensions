@@ -33,67 +33,58 @@ import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.httpclient.URI;
+import org.parosproxy.paros.network.HttpSender;
 
 
 public class PostmanParser {
-    public static void importFromFile(final File file) {
-        try {
-            String defn = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
-            importDefinition(defn);
-        }
-        catch (Exception e) {
-            System.out.println("Exception");
-        }
+    public static void importFromFile(final File file) throws Exception {
+        
+        String defn = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
+        importDefinition(defn);
+        
+        
     }
 
-    public static void importDefinition(String defn) {
+    public static void importDefinition(String defn) throws Exception {
         ObjectNode jsonNode = parse(defn);
         
         List<HttpMessage> list = mapJsonNodeToHttpMessages(jsonNode);
 
-        // ObjectNode node = (ObjectNode) jsonNode;
-    
-        // JsonNode value = node.get("item");
-		// ArrayNode arrayNode = null;
-		// if (value == null) {
-		// 	System.out.println("NOTT FOUND");
-		// } else if (!value.getNodeType().equals(JsonNodeType.ARRAY)) {
-		// 	System.out.println("NOT OF ARRAY TYPE");
-		// } else {
-		// 	arrayNode = (ArrayNode) value;
-		// }
-		
-        // if (arrayNode != null && arrayNode.size() > 0) {
-        //     for (int i = 0; i < arrayNode.size(); i++) {
-        //         System.out.println("For " + i + " Value: " + arrayNode.get(i));
-        //     }
-        // }
+        for (int i = 0; i < list.size(); i++) {
+            System.out.println(list.get(i).getNote());
+        }
 
+        Requestor requestor = new Requestor(HttpSender.MANUAL_REQUEST_INITIATOR);
+        requestor.addListener(new HistoryPersister());
+
+        requestor.run(list);
     }
 
-    public static ObjectNode parse(String defn) {
+    public static ObjectNode parse(String defn) throws Exception{
         ObjectMapper mapper = new ObjectMapper();
-        try {
-            JsonNode defnNode = mapper.readTree(defn);
-            return (ObjectNode) defnNode;
-        } catch (IOException e) {
-            System.out.println("Exception");
-        }
-        return null;
+
+        JsonNode defnNode = mapper.readTree(defn);
+        return (ObjectNode) defnNode;
+        
     }
 
     public static List<HttpMessage> mapJsonNodeToHttpMessages(JsonNode node) {
         List<HttpMessage> httpMessages = new ArrayList<>();
-       
-        try{
+        
+        if (node.has("item")) {
             ArrayNode item = (ArrayNode) node.get("item");
-            for (int i = 0; i < item.size(); i++) {
-                extractHttpMessages(item.get(i), httpMessages);
+
+            try {
+                for (int i = 0; i < item.size(); i++) {
+                    extractHttpMessages(item.get(i), httpMessages);
+                }
+            }
+            catch (Exception e) {
+                System.out.println("Exception "+ e);
             }
         }
-        catch (Exception e) {
-            System.out.println("Exception1 " + e.message);
-        }
+        
         
         return httpMessages;
     }
@@ -103,12 +94,48 @@ public class PostmanParser {
 
         if (itemObject.has("item")) {
             // is an item-group
-            extractHttpMessages(itemObject.get("item"), list);
+            ArrayNode array = (ArrayNode) itemObject.get("item");
+            
+            for (int i = 0; i < array.size(); i++) {
+                extractHttpMessages(array.get(i), list);
+            }
         }
-        else {
+        else if (itemObject.has("request")){
             // is an item
             // TODO: extract httpmessages
-            System.out.println("NAME: " + item.get("name"));
+            ObjectNode request = (ObjectNode) itemObject.get("request");
+
+            try {
+                
+                System.out.println("URLLLLLLL IS: " + request.get("url").get("raw").textValue());
+                HttpMessage httpMessage = new HttpMessage();
+                httpMessage.getRequestHeader().setURI(new URI(request.get("url").get("raw").textValue(), false));
+
+                System.out.println(httpMessage.getRequestHeader().getURI());
+                System.out.println("METHOD IS: " + request.get("method").textValue());
+                httpMessage.getRequestHeader().setMethod(request.get("method").textValue());
+
+                for (JsonNode header : (ArrayNode) request.get("header")) {
+                    System.out.println("KEY IS: " + header.get("key").textValue());
+                    System.out.println("VALUE IS: " + header.get("value").textValue());
+                    httpMessage.getRequestHeader().setHeader(header.get("key").textValue(), header.get("value").textValue());
+                }
+
+                if (request.has("body")) {
+                    httpMessage.getRequestBody().setBody(request.get("body").toString());
+                    httpMessage.getRequestHeader().setContentLength(request.get("body").toString().length());
+                }
+            
+                System.out.println("NAME IS: " + itemObject.get("name").textValue());
+                httpMessage.setNote(itemObject.get("name").textValue());
+                
+
+                list.add(httpMessage);
+            }
+            catch (Exception e) {
+                System.out.println("Exception " + e);
+            }
+            
         }
 
     }

@@ -89,7 +89,13 @@ public class ImportFromFileDialog extends ImportFromAbstractDialog {
             showWarningDialog(Constant.messages.getString(MESSAGE_PREFIX + "badfile"));
             return false;
         }
-        PostmanParser.importFromFile(file);
+        try {
+            PostmanParser.importFromFile(file);
+        }
+        catch (Exception e) {
+            showWarningDialog(e.toString());
+        }
+        
 
         // TODO: Implement importing
         return true;

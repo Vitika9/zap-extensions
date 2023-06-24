@@ -106,9 +106,15 @@ public class Requestor {
 
     /** Notifies the {@link #listeners} of the messages sent. */
     private class MessageHandler implements HttpRedirectionValidator {
-
+        
         @Override
         public void notifyMessageReceived(HttpMessage message) {
+            if (message.getRequestHeader().getURI() == null) {
+                System.out.println("URII ISS NOOT PRESENT here in handler");
+            }
+            else {
+                System.out.println("URII ISS HAII PRESENT here in handler");
+            }
             for (RequesterListener listener : listeners) {
                 try {
                     listener.handleMessage(message, initiator);
