@@ -83,14 +83,13 @@ public class ImportFromFileDialog extends ImportFromAbstractDialog {
 
     @Override
     protected boolean importDefinition() {
-        File file = new File(getFromField().getText());
-
-        if (!file.canRead()) {
-            showWarningDialog(Constant.messages.getString(MESSAGE_PREFIX + "badfile"));
+        try {
+            PostmanParser parser = new PostmanParser();
+            parser.importFromFile(getFromField().getText());
+            return true;
+        } catch (Exception e) {
+            showWarningDialog(e.getMessage());
             return false;
         }
-
-        // TODO: Implement importing
-        return true;
     }
 }
